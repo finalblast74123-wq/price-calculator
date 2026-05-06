@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>商品售價計算機</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const App = () => {
+      const [products, setProducts] = useState([
+        { id: 1, name: '經典手沖咖啡豆', cost: 450 },
+        { id: 2, name: '精選高山烏龍', cost: 1200 },
+        { id: 3, name: '手工造型餅乾', cost: 85 },
+        { id: 4, name: '法式馬卡龍禮盒', cost: 600 }
+      ]);
+
+      const [tier, setTier] = useState('cost');
+      const [quantities, setQuantities] = useState({});
+      const [newProductName, setNewProductName] = useState('');
+      const [newProductCost, setNewProductCost] = useState('');
+      const [showDbManager, setShowDbManager] = useState(false);
+
+      const calculateUnitPrice = (cost, currentTier) => {
+        let price = cost;
+        if (currentTier === 'friends') {
+          price = cost * 1.5;
+          const tensDigit = Math.floor(price / 10) % 10;
+          if (tensDigit !== 0) price = Math.ceil(price / 100) * 100;
+        } else if (currentTier === 'wholesale') {
+          price = cost * 2;
+        }
+        return price;
+      };
+
+      const handleQuantityChange = (id, value) => {
+        const val = value === '' ? 0 : parseInt(value);
+        setQuantities(prev => ({ ...prev, [id]: Math.max(0, val) }));
+      };
+
+      const addProduct = (e) => {
+        e.preventDefault();
+        if (!newProductName || !newProductCost) return;
+        setProducts([...products, { id: Date.now(), name: newProductName, cost: parseFloat(newProductCost) }]);
+        setNewProductName(''); setNewProductCost('');
+      };
+
+      const deleteProduct = (id) => {
+        setProducts(products.filter(p => p.id !== id));
+        const newQuants = { ...quantities };
+        delete newQuants[id];
+        setQuantities(newQuants);
+      };
+
+      const totalAmount = useMemo(() => {
+        return products.reduce((acc, product) => {
+          const q = quantities[product.id] || 0;
+          return acc + (calculateUnitPrice(product.cost, tier) * q);
+        }, 0);
+      }, [products, tier, quantities]);
+
+      return (
+        <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-800 font-sans">
+          <div className="max-w-4xl mx-auto">
+            <header className="flex justify-between items-center mb-8">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
+                  🧮 商品售價計算機
+                </h1>
+                <p className="text-slate-500 mt-1">快速計算不同對象的產品報價</p>
+              </div>
+              <button onClick={() => setShowDbManager(!showDbManager)} className={`px-4 py-2 rounded-lg transition-colors ${showDbManager ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                ⚙️ {showDbManager ? '完成編輯' : '管理資料庫'}
+              </button>
+            </header>
+
+            {showDbManager && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+                <h2 className="text-lg font-semibold mb-4">📦 產品資料庫管理</h2>
+                <form onSubmit={addProduct} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <input type="text" placeholder="產品名稱" className="px-4 py-2 border border-slate-200 rounded-lg outline-none" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} />
+                  <input type="number" placeholder="成本金額" className="px-4 py-2 border border-slate-200 rounded-lg outline-none" value={newProductCost} onChange={(e) => setNewProductCost(e.target.value)} />
+                  <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">➕ 新增品項</button>
+                </form>
+                <table className="w-full text-left">
+                  <tbody className="divide-y divide-slate-50">
+                    {products.map(p => (
+                      <tr key={p.id}>
+                        <td className="py-3 px-2 font-medium">{p.name}</td>
+                        <td className="py-3 px-2 text-right text-blue-600">${p.cost.toLocaleString()}</td>
+                        <td className="py-3 px-2 text-center">
+                          <button onClick={() => deleteProduct(p.id)} className="p-2 text-red-400 hover:text-red-600">🗑️</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <main className="grid grid-cols-1 gap-6">
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center justify-between">
+                <span className="text-slate-600 font-medium">請選擇售價模式：</span>
+                <div className="flex p-1 bg-slate-100 rounded-lg gap-1">
+                  {[
+                    { id: 'cost', label: '🏷️ 原始成本', multiplier: 'x1.0' },
+                    { id: 'friends', label: '🤝 親友價', multiplier: 'x1.5*' },
+                    { id: 'wholesale', label: '🏢 批發價', multiplier: 'x2.0' }
+                  ].map((t) => (
+                    <button key={t.id} onClick={() => setTier(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-md ${tier === t.id ? 'bg-white text-blue-600 font-semibold' : 'text-slate-500'}`}>
+                      <span>{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+                  {products.map(product => {
+                    const unitPrice = calculateUnitPrice(product.cost, tier);
+                    const quantity = quantities[product.id] || 0;
+                    const subtotal = unitPrice * quantity;
+                    return (
+                      <div key={product.id} className="p-4 grid grid-cols-12 gap-4 items-center">
+                        <div className="col-span-12 md:col-span-5">
+                          <p className="font-bold text-slate-800">{product.name}</p>
+                          <div className="flex gap-4 mt-1">
+                            <span className="text-xs text-slate-400">成本: ${product.cost}</span>
+                            <span className="text-xs font-semibold px-2 rounded-full bg-slate-100 text-slate-600">單價: ${unitPrice.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div className="col-span-6 md:col-span-3">
+                          <input type="number" min="0" className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-center" placeholder="數量: 0" value={quantities[product.id] || ''} onChange={(e) => handleQuantityChange(product.id, e.target.value)} />
+                        </div>
+                        <div className="col-span-6 md:col-span-4 text-right">
+                          <p className={`text-xl font-bold ${subtotal > 0 ? 'text-blue-600' : 'text-slate-300'}`}>${subtotal.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                  <div>
+                    <p className="text-slate-400 text-sm">總計金額 (Total)</p>
+                    <p className="text-4xl font-black text-blue-400">${totalAmount.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
